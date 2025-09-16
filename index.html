@@ -508,6 +508,15 @@
                 description: 'Asiel, Migratie, Integratie',
                 realBudget: 8.9,
                 categories: ['Asiel en Migratie']
+            },
+            {
+                id: 'wildcard',
+                name: 'Eigen Thema',
+                icon: '✨',
+                description: 'Jouw eigen prioriteit',
+                realBudget: 0,
+                categories: ['Eigen Thema'],
+                isWildcard: true
             }
         ];
 
@@ -525,6 +534,7 @@
         let budgetAllocations = {};
         let comparisonMode = false;
         let uitgavenChart = null;
+        let wildcardName = 'Eigen Thema';
 
         function initApp() {
             renderThemes();
@@ -541,11 +551,24 @@
                 div.className = selectedThemes.includes(theme.id) ? 'theme-card selected' : 'theme-card';
                 div.onclick = () => toggleTheme(theme.id);
                 
+                let themeDisplayName = theme.name;
+                if (theme.isWildcard && wildcardName !== 'Eigen Thema') {
+                    themeDisplayName = wildcardName;
+                }
+                
                 div.innerHTML = `
                     <span class="theme-icon">${theme.icon}</span>
-                    <div class="theme-name">${theme.name}</div>
+                    <div class="theme-name">${themeDisplayName}</div>
                     <div class="theme-description">${theme.description}</div>
-                    ${comparisonMode ? `<div style="margin-top: 10px; font-weight: bold; color: #2f54eb;">Werkelijk: €${theme.realBudget.toFixed(1)}B</div>` : ''}
+                    ${theme.isWildcard && selectedThemes.includes(theme.id) ? `
+                        <input type="text" 
+                               placeholder="Vul je eigen thema in..." 
+                               value="${wildcardName === 'Eigen Thema' ? '' : wildcardName}"
+                               onchange="updateWildcardName(this.value)"
+                               onclick="event.stopPropagation()"
+                               style="margin-top: 10px; padding: 5px; border: 1px solid #ddd; border-radius: 5px; width: 100%; font-size: 0.9rem;">
+                    ` : ''}
+                    ${comparisonMode && !theme.isWildcard ? `<div style="margin-top: 10px; font-weight: bold; color: #2f54eb;">Werkelijk: EUR ${theme.realBudget.toFixed(1)}B</div>` : ''}
                 `;
                 
                 container.appendChild(div);
@@ -590,15 +613,23 @@
                 const theme = themes.find(t => t.id === themeId);
                 const amount = budgetAllocations[themeId] || 0;
                 
-                const div = document.createElement('div');
-                div.className = comparisonMode ? 'budget-item comparison-mode' : 'budget-item';
+                let displayName = theme.name;
+                let displayIcon = theme.icon;
                 
-                const comparisonBarHeight = comparisonMode ? (theme.realBudget / 125 * 100) : 0;
+                if (theme.isWildcard) {
+                    displayName = wildcardName;
+                    displayIcon = wildcardName === 'Eigen Thema' ? '✨' : '🎯';
+                }
+                
+                const div = document.createElement('div');
+                div.className = comparisonMode && !theme.isWildcard ? 'budget-item comparison-mode' : 'budget-item';
+                
+                const comparisonBarHeight = comparisonMode && !theme.isWildcard ? (theme.realBudget / 125 * 100) : 0;
                 
                 div.innerHTML = `
                     <div class="budget-item-header">
-                        <span class="budget-item-name">${theme.icon} ${theme.name}</span>
-                        <span class="budget-item-amount">€ ${amount.toFixed(1)}B</span>
+                        <span class="budget-item-name">${displayIcon} ${displayName}</span>
+                        <span class="budget-item-amount">EUR ${amount.toFixed(1)}B</span>
                     </div>
                     <div class="slider-container">
                         <input type="range" 
@@ -610,9 +641,9 @@
                                step="0.1"
                                onchange="updateBudget('${themeId}', this.value)">
                     </div>
-                    ${comparisonMode ? `
+                    ${comparisonMode && !theme.isWildcard ? `
                         <div class="comparison-bar" style="height: ${comparisonBarHeight}%"></div>
-                        <div class="comparison-tooltip">Werkelijk: €${theme.realBudget.toFixed(1)}B</div>
+                        <div class="comparison-tooltip">Werkelijk: EUR ${theme.realBudget.toFixed(1)}B</div>
                     ` : ''}
                 `;
                 container.appendChild(div);
@@ -631,7 +662,7 @@
                 div.innerHTML = `
                     <div class="budget-item-header">
                         <span class="budget-item-name">📦 Overig</span>
-                        <span class="budget-item-amount">€ ${overigAmount.toFixed(1)}B</span>
+                        <span class="budget-item-amount">EUR ${overigAmount.toFixed(1)}B</span>
                     </div>
                     <div class="slider-container">
                         <input type="range" 
@@ -645,7 +676,7 @@
                     </div>
                     ${comparisonMode ? `
                         <div class="comparison-bar" style="height: ${comparisonBarHeight}%"></div>
-                        <div class="comparison-tooltip">Werkelijk: €${overigRealBudget.toFixed(1)}B</div>
+                        <div class="comparison-tooltip">Werkelijk: EUR ${overigRealBudget.toFixed(1)}B</div>
                     ` : ''}
                 `;
                 container.appendChild(div);
@@ -730,7 +761,11 @@
                 const theme = themes.find(t => t.id === themeId);
                 const amount = budgetAllocations[themeId] || 0;
                 if (amount > 0) {
-                    labels.push(theme.name);
+                    let displayName = theme.name;
+                    if (theme.isWildcard) {
+                        displayName = wildcardName;
+                    }
+                    labels.push(displayName);
                     data.push(amount);
                 }
             });
@@ -765,7 +800,7 @@
                             tooltip: {
                                 callbacks: {
                                     label: function(context) {
-                                        return context.label + ': €' + context.parsed.toFixed(1) + 'B';
+                                        return context.label + ': EUR ' + context.parsed.toFixed(1) + 'B';
                                     }
                                 }
                             }
@@ -775,12 +810,23 @@
             }
         }
 
+        function updateWildcardName(newName) {
+            if (newName.trim() !== '') {
+                wildcardName = newName.trim();
+            } else {
+                wildcardName = 'Eigen Thema';
+            }
+            renderBudgetSliders();
+            updateChart();
+        }
+
         function resetBudget() {
             selectedThemes = [];
             budgetAllocations = {};
             comparisonMode = false;
+            wildcardName = 'Eigen Thema';
             
-            document.getElementById('comparisonBtn').textContent = '👁️ Toon Werkelijke Begroting';
+            document.getElementById('comparisonBtn').textContent = 'Toon Werkelijke Begroting';
             document.getElementById('comparisonBtn').classList.remove('btn-secondary');
             document.getElementById('comparisonBtn').classList.add('btn-primary');
             
@@ -795,11 +841,11 @@
             const btn = document.getElementById('comparisonBtn');
             
             if (comparisonMode) {
-                btn.textContent = '❌ Verberg Werkelijke Begroting';
+                btn.textContent = 'Verberg Werkelijke Begroting';
                 btn.classList.remove('btn-primary');
                 btn.classList.add('btn-secondary');
             } else {
-                btn.textContent = '👁️ Toon Werkelijke Begroting';
+                btn.textContent = 'Toon Werkelijke Begroting';
                 btn.classList.remove('btn-secondary');
                 btn.classList.add('btn-primary');
             }
@@ -888,7 +934,13 @@
                     doc.setTextColor(...textColor);
                     doc.setFontSize(11);
                     doc.setFont('helvetica', 'normal');
-                    doc.text(`${theme.name}`, 35, yPosition);
+                    
+                    let displayName = theme.name;
+                    if (theme.isWildcard) {
+                        displayName = wildcardName;
+                    }
+                    
+                    doc.text(displayName, 35, yPosition);
                     
                     doc.setFont('helvetica', 'bold');
                     doc.setTextColor(...primaryColor);
